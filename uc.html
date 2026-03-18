@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreqControl — Frequência</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .freq-header-cell {
+      min-width: 48px;
+      text-align: center;
+      padding: 0.5rem 0.3rem;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--text3);
+    }
+    .freq-cell {
+      text-align: center;
+      padding: 0.4rem;
+    }
+    .pres-btn {
+      width: 30px; height: 30px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 0.75rem;
+      background: var(--surface2);
+      color: var(--text3);
+      transition: all 0.12s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pres-btn.presente { background: rgba(0,214,143,0.2); color: var(--success); border-color: rgba(0,214,143,0.5); }
+    .pres-btn.falta    { background: rgba(255,59,92,0.18); color: var(--danger);  border-color: rgba(255,59,92,0.4); }
+    .pres-btn:hover { transform: scale(1.12); }
+    .pct-cell { font-family: var(--font-mono); font-size: 0.8rem; min-width: 60px; text-align:right; }
+    .row-consec { background: rgba(255,154,0,0.04) !important; }
+    .row-baixa  { background: rgba(255,59,92,0.04) !important; }
+    .aluno-cell { min-width: 180px; }
+
+    .legend {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text2);
+      margin-bottom: 1rem;
+    }
+    .legend-item { display: flex; align-items: center; gap: 0.4rem; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    .aula-delete-btn {
+      background: none;
+      border: none;
+      color: var(--text3);
+      cursor: pointer;
+      font-size: 0.65rem;
+      padding: 1px 3px;
+      border-radius: 3px;
+    }
+    .aula-delete-btn:hover { color: var(--danger); background: rgba(255,59,92,0.1); }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-logo"><span class="dot"></span> FreqControl</div>
+    <div class="nav-right">
+      <span class="nav-user" id="nav-user">—</span>
+      <button class="btn btn-ghost btn-sm" onclick="Auth.logout()">Sair</button>
+    </div>
+  </nav>
+
+  <div class="breadcrumb">
+    <a href="portal.html">Portal</a>
+    <span class="sep">›</span>
+    <a id="bc-turma" href="#">Turma</a>
+    <span class="sep">›</span>
+    <span class="current" id="bc-uc">UC</span>
+  </div>
+
+  <div class="container" style="max-width:1300px">
+    <div class="page-header">
+      <div>
+        <div class="page-title" id="uc-nome">—</div>
+        <div class="page-subtitle" id="uc-meta">—</div>
+      </div>
+      <button class="btn btn-primary" onclick="openModalAula()">+ Nova Aula</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row" id="stats-row" style="grid-template-columns: repeat(4,1fr)">
+      <div class="stat-card">
+        <div class="stat-label">Alunos</div>
+        <div class="stat-value" id="stat-alunos">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Aulas Realizadas</div>
+        <div class="stat-value" id="stat-aulas">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">⚠ Faltas Consec.</div>
+        <div class="stat-value" style="color:var(--warning)" id="stat-consec">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">🚨 Baixa Presença</div>
+        <div class="stat-value" style="color:var(--danger)" id="stat-baixa">0</div>
+      </div>
+    </div>
+
+    <div id="msg-freq" class="msg" style="margin-bottom:1rem"></div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--success)"></div> Presente</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--danger)"></div> Falta</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--surface3)"></div> Não registrado</div>
+      <div class="legend-item">
+        <span style="color:var(--warning)">⚠</span> 2+ faltas consecutivas
+      </div>
+      <div class="legend-item">
+        <span style="color:var(--danger)">🚨</span> Presença abaixo de 40%
+      </div>
+    </div>
+
+    <div class="table-wrap" id="freq-container">
+      <div class="empty-state"><div class="icon">📋</div><p>Nenhuma aula registrada.</p></div>
+    </div>
+  </div>
+
+  <!-- Modal Nova Aula -->
+  <div class="modal-overlay" id="modal-aula">
+    <div class="modal">
+      <div class="modal-title">Registrar Nova Aula</div>
+      <div id="msg-modal-aula" class="msg"></div>
+      <div class="form-group">
+        <label>Data da Aula</label>
+        <input type="date" id="input-aula-data">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeModalAula()">Cancelar</button>
+        <button class="btn btn-primary" onclick="criarAula()">Criar Aula</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/storage.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/turmas.js"></script>
+  <script src="js/alunos.js"></script>
+  <script src="js/ucs.js"></script>
+  <script src="js/frequencia.js"></script>
+
+  <script>
+    const user = Auth.requireLogin();
+    const params = new URLSearchParams(window.location.search);
+    const turmaId = params.get('turma');
+    const ucId = params.get('uc');
+
+    if (!turmaId || !ucId) window.location.href = 'portal.html';
+
+    const turma = Storage.getTurma(turmaId);
+    const uc = UCs.getById(turmaId, ucId);
+
+    if (!turma || turma.userId !== user.id || !uc) window.location.href = 'portal.html';
+
+    document.getElementById('nav-user').textContent = user.email;
+    document.getElementById('bc-turma').textContent = turma.nome;
+    document.getElementById('bc-turma').href = `turma.html?id=${turmaId}`;
+    document.getElementById('bc-uc').textContent = uc.nome;
+    document.getElementById('uc-nome').textContent = uc.nome;
+    document.getElementById('uc-meta').textContent = `${uc.totalAulas} aulas planejadas · peso por aula: ${(100/uc.totalAulas).toFixed(2)}%`;
+
+    // Default date to today
+    document.getElementById('input-aula-data').valueAsDate = new Date();
+
+    function togglePresenca(aulaId, alunoId, btn) {
+      const current = btn.dataset.estado;
+      let next;
+      if (current === 'null') next = 'presente';
+      else if (current === 'presente') next = 'falta';
+      else next = 'null';
+
+      btn.dataset.estado = next;
+      if (next === 'presente') {
+        btn.className = 'pres-btn presente';
+        btn.textContent = '✓';
+        Frequencia.setPresenca(turmaId, ucId, aulaId, alunoId, true);
+      } else if (next === 'falta') {
+        btn.className = 'pres-btn falta';
+        btn.textContent = '✗';
+        Frequencia.setPresenca(turmaId, ucId, aulaId, alunoId, false);
+      } else {
+        btn.className = 'pres-btn';
+        btn.textContent = '·';
+        // Remove from storage
+        const p = Storage.getPresencas(turmaId, ucId, aulaId);
+        delete p[alunoId];
+        Storage.savePresencas(turmaId, ucId, aulaId, p);
+      }
+
+      // Update row alerts live
+      updateRowAlert(alunoId);
+      updateStats();
+    }
+
+    function updateRowAlert(alunoId) {
+      const row = document.getElementById(`row-${alunoId}`);
+      if (!row) return;
+      const stats = Frequencia.computeStats(turmaId, ucId, alunoId, uc);
+      applyRowStyle(row, alunoId, stats);
+    }
+
+    function applyRowStyle(row, alunoId, stats) {
+      row.className = '';
+      const nomeEl = row.querySelector('.aluno-nome');
+      const alertContainer = row.querySelector('.alert-tags');
+      alertContainer.innerHTML = '';
+
+      if (stats.faltasConsecutivas) {
+        row.classList.add('row-consec');
+        alertContainer.innerHTML += `<span class="alert-tag alert-consec">⚠ faltas consecutivas</span>`;
+        if (nomeEl) nomeEl.style.color = 'var(--warning)';
+      } else {
+        if (nomeEl) nomeEl.style.color = '';
+      }
+
+      if (stats.baixaPresenca) {
+        row.classList.add('row-baixa');
+        alertContainer.innerHTML += `<span class="alert-tag alert-baixa">🚨 alerta de faltas</span>`;
+        if (!stats.faltasConsecutivas && nomeEl) nomeEl.style.color = 'var(--danger)';
+      }
+
+      // Update pct cell
+      const pctEl = row.querySelector('.pct-cell');
+      if (pctEl) {
+        const pct = stats.pct;
+        let color = 'var(--success)';
+        if (pct < 40) color = 'var(--danger)';
+        else if (pct < 75) color = 'var(--warning)';
+        pctEl.innerHTML = `<span style="color:${color}">${pct.toFixed(0)}%</span>`;
+      }
+    }
+
+    function updateStats() {
+      const alunos = Alunos.getAll(turmaId);
+      const aulas = Frequencia.getAulas(turmaId, ucId);
+      let consec = 0, baixa = 0;
+      alunos.forEach(a => {
+        const s = Frequencia.computeStats(turmaId, ucId, a.id, uc);
+        if (s.faltasConsecutivas) consec++;
+        if (s.baixaPresenca) baixa++;
+      });
+      document.getElementById('stat-alunos').textContent = alunos.length;
+      document.getElementById('stat-aulas').textContent = `${aulas.length}/${uc.totalAulas}`;
+      document.getElementById('stat-consec').textContent = consec;
+      document.getElementById('stat-baixa').textContent = baixa;
+    }
+
+    function renderFreq() {
+      const alunos = Alunos.getAll(turmaId);
+      const aulas = Frequencia.getMatrix(turmaId, ucId); // sorted
+      const cont = document.getElementById('freq-container');
+
+      if (alunos.length === 0) {
+        cont.innerHTML = `<div class="empty-state"><div class="icon">👤</div>
+          <p>Cadastre alunos na turma antes de registrar frequência.</p>
+          <a href="turma.html?id=${turmaId}" class="btn btn-ghost" style="margin-top:1rem">← Ir para Turma</a>
+        </div>`;
+        updateStats();
+        return;
+      }
+
+      if (aulas.length === 0) {
+        cont.innerHTML = `<div class="empty-state"><div class="icon">📅</div>
+          <p>Nenhuma aula registrada. Clique em <strong>+ Nova Aula</strong> para começar.</p></div>`;
+        updateStats();
+        return;
+      }
+
+      // Build table
+      let html = `<table>
+        <thead>
+          <tr>
+            <th class="aluno-cell">Aluno</th>`;
+      aulas.forEach(a => {
+        html += `<th class="freq-header-cell" title="${a.data}">
+          <div>${a.label}</div>
+          <div style="font-size:0.6rem;color:var(--text3)">${formatDate(a.data)}</div>
+          <button class="aula-delete-btn" onclick="deleteAula('${a.id}')" title="Remover aula">✕</button>
+        </th>`;
+      });
+      html += `<th class="freq-header-cell">Presença</th><th></th></tr>
+        </thead>
+        <tbody>`;
+
+      alunos.forEach(a => {
+        const stats = Frequencia.computeStats(turmaId, ucId, a.id, uc);
+        const pct = stats.pct;
+        let pctColor = 'var(--success)';
+        if (pct < 40) pctColor = 'var(--danger)';
+        else if (pct < 75) pctColor = 'var(--warning)';
+
+        let rowClass = '';
+        if (stats.faltasConsecutivas) rowClass += ' row-consec';
+        if (stats.baixaPresenca) rowClass += ' row-baixa';
+
+        let alertTags = '';
+        if (stats.faltasConsecutivas) alertTags += `<span class="alert-tag alert-consec">⚠ faltas consecutivas</span>`;
+        if (stats.baixaPresenca) alertTags += `<span class="alert-tag alert-baixa">🚨 alerta de faltas</span>`;
+
+        let nameColor = '';
+        if (stats.faltasConsecutivas) nameColor = 'color:var(--warning)';
+        else if (stats.baixaPresenca) nameColor = 'color:var(--danger)';
+
+        html += `<tr id="row-${a.id}" class="${rowClass}">
+          <td class="aluno-cell">
+            <div class="aluno-nome" style="${nameColor}">${a.nome}</div>
+            <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text3)">${a.matricula}</div>
+            <div class="alert-tags">${alertTags}</div>
+          </td>`;
+
+        aulas.forEach(aula => {
+          const p = Frequencia.getPresenca(turmaId, ucId, aula.id, a.id);
+          let estado, cls, icon;
+          if (p === true) { estado = 'presente'; cls = 'pres-btn presente'; icon = '✓'; }
+          else if (p === false) { estado = 'falta'; cls = 'pres-btn falta'; icon = '✗'; }
+          else { estado = 'null'; cls = 'pres-btn'; icon = '·'; }
+
+          html += `<td class="freq-cell">
+            <button class="${cls}" data-estado="${estado}"
+              onclick="togglePresenca('${aula.id}','${a.id}',this)">${icon}</button>
+          </td>`;
+        });
+
+        html += `<td class="pct-cell"><span style="color:${pctColor}">${pct.toFixed(0)}%</span></td>
+          <td></td>
+        </tr>`;
+      });
+
+      html += `</tbody></table>`;
+      cont.innerHTML = html;
+      updateStats();
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '';
+      const [y, m, d] = iso.split('-');
+      return `${d}/${m}`;
+    }
+
+    function openModalAula() {
+      document.getElementById('modal-aula').classList.add('open');
+    }
+
+    function closeModalAula() {
+      document.getElementById('modal-aula').classList.remove('open');
+      hideMsg(document.getElementById('msg-modal-aula'));
+    }
+
+    function criarAula() {
+      const alunos = Alunos.getAll(turmaId);
+      const msg = document.getElementById('msg-modal-aula');
+      if (alunos.length === 0) {
+        return showMsg(msg, 'error', 'Cadastre alunos na turma antes de criar aulas.');
+      }
+      const data = document.getElementById('input-aula-data').value;
+      if (!data) return showMsg(msg, 'error', 'Selecione a data da aula.');
+
+      Frequencia.criarAula(turmaId, ucId, data);
+      closeModalAula();
+      renderFreq();
+    }
+
+    function deleteAula(aulaId) {
+      if (!confirm('Remover esta aula e todas as presenças registradas?')) return;
+      Frequencia.deleteAula(turmaId, ucId, aulaId);
+      renderFreq();
+    }
+
+    document.getElementById('modal-aula').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeModalAula();
+    });
+
+    renderFreq();
+  </script>
+</body>
+</html>

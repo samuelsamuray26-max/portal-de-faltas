@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreqControl — Turma</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-logo"><span class="dot"></span> FreqControl</div>
+    <div class="nav-right">
+      <span class="nav-user" id="nav-user">—</span>
+      <button class="btn btn-ghost btn-sm" onclick="Auth.logout()">Sair</button>
+    </div>
+  </nav>
+
+  <div class="breadcrumb">
+    <a href="portal.html">Portal</a>
+    <span class="sep">›</span>
+    <span class="current" id="bc-turma">Turma</span>
+  </div>
+
+  <div class="container">
+    <div class="page-header">
+      <div>
+        <div class="page-title" id="turma-nome">—</div>
+        <div class="page-subtitle" id="turma-meta">Gerencie alunos e unidades curriculares</div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('alunos', this)">👥 Alunos</button>
+      <button class="tab-btn" onclick="switchTab('ucs', this)">📚 Unidades Curriculares</button>
+    </div>
+
+    <!-- ── TAB ALUNOS ── -->
+    <div id="tab-alunos" class="tab-content active">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <div>
+          <span class="badge badge-neutral" id="badge-total-alunos">0 alunos</span>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openModalAluno()">+ Cadastrar Aluno</button>
+      </div>
+
+      <div id="msg-aluno" class="msg"></div>
+
+      <div class="table-wrap" id="alunos-container">
+        <div class="empty-state"><div class="icon">👤</div><p>Nenhum aluno cadastrado.</p></div>
+      </div>
+    </div>
+
+    <!-- ── TAB UCs ── -->
+    <div id="tab-ucs" class="tab-content">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <div>
+          <span class="badge badge-neutral" id="badge-total-ucs">0 UCs</span>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openModalUC()">+ Nova UC</button>
+      </div>
+
+      <div id="msg-uc" class="msg"></div>
+
+      <div id="ucs-list">
+        <div class="empty-state"><div class="icon">📚</div><p>Nenhuma UC cadastrada.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Aluno -->
+  <div class="modal-overlay" id="modal-aluno">
+    <div class="modal">
+      <div class="modal-title" id="modal-aluno-title">Cadastrar Aluno</div>
+      <div id="msg-modal-aluno" class="msg"></div>
+      <div class="form-group">
+        <label>Nome do Aluno</label>
+        <input type="text" id="input-aluno-nome" placeholder="Nome completo">
+      </div>
+      <div class="form-group">
+        <label>Matrícula</label>
+        <input type="text" id="input-aluno-matricula" placeholder="Ex: 2025001">
+      </div>
+      <input type="hidden" id="input-aluno-id">
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeModalAluno()">Cancelar</button>
+        <button class="btn btn-primary" id="btn-salvar-aluno" onclick="salvarAluno()">Cadastrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal UC -->
+  <div class="modal-overlay" id="modal-uc">
+    <div class="modal">
+      <div class="modal-title" id="modal-uc-title">Nova Unidade Curricular</div>
+      <div id="msg-modal-uc" class="msg"></div>
+      <div class="form-group">
+        <label>Nome da UC</label>
+        <input type="text" id="input-uc-nome" placeholder="Ex: Programação Web">
+      </div>
+      <div class="form-group">
+        <label>Total de Aulas Planejadas</label>
+        <input type="number" id="input-uc-aulas" placeholder="Ex: 40" min="1">
+      </div>
+      <input type="hidden" id="input-uc-id">
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeModalUC()">Cancelar</button>
+        <button class="btn btn-primary" id="btn-salvar-uc" onclick="salvarUC()">Criar UC</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/storage.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/turmas.js"></script>
+  <script src="js/alunos.js"></script>
+  <script src="js/ucs.js"></script>
+
+  <script>
+    const user = Auth.requireLogin();
+    const params = new URLSearchParams(window.location.search);
+    const turmaId = params.get('id');
+
+    if (!turmaId) window.location.href = 'portal.html';
+
+    const turma = Storage.getTurma(turmaId);
+    if (!turma || turma.userId !== user.id) window.location.href = 'portal.html';
+
+    document.getElementById('nav-user').textContent = user.email;
+    document.getElementById('turma-nome').textContent = turma.nome;
+    document.getElementById('bc-turma').textContent = turma.nome;
+
+    // ── TABS ──
+    function switchTab(name, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + name).classList.add('active');
+    }
+
+    // ── ALUNOS ──
+    function renderAlunos() {
+      const alunos = Alunos.getAll(turmaId);
+      document.getElementById('badge-total-alunos').textContent = `${alunos.length} aluno${alunos.length !== 1 ? 's' : ''}`;
+      const cont = document.getElementById('alunos-container');
+
+      if (alunos.length === 0) {
+        cont.innerHTML = `<div class="empty-state"><div class="icon">👤</div><p>Nenhum aluno cadastrado.</p></div>`;
+        return;
+      }
+
+      cont.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Matrícula</th>
+              <th style="text-align:right">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${alunos.map(a => `
+              <tr>
+                <td>${a.nome}</td>
+                <td><span class="badge badge-neutral" style="font-family:var(--font-mono)">${a.matricula}</span></td>
+                <td style="text-align:right">
+                  <button class="btn btn-ghost btn-sm" onclick="editarAluno('${a.id}')">✎ Editar</button>
+                  <button class="btn btn-danger btn-sm" onclick="removerAluno('${a.id}')">✕</button>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    function openModalAluno(edit = false) {
+      document.getElementById('modal-aluno-title').textContent = edit ? 'Editar Aluno' : 'Cadastrar Aluno';
+      document.getElementById('btn-salvar-aluno').textContent = edit ? 'Salvar' : 'Cadastrar';
+      document.getElementById('modal-aluno').classList.add('open');
+      if (!edit) {
+        document.getElementById('input-aluno-nome').value = '';
+        document.getElementById('input-aluno-matricula').value = '';
+        document.getElementById('input-aluno-id').value = '';
+      }
+      setTimeout(() => document.getElementById('input-aluno-nome').focus(), 100);
+    }
+
+    function closeModalAluno() {
+      document.getElementById('modal-aluno').classList.remove('open');
+      hideMsg(document.getElementById('msg-modal-aluno'));
+    }
+
+    function editarAluno(id) {
+      const alunos = Alunos.getAll(turmaId);
+      const a = alunos.find(x => x.id === id);
+      if (!a) return;
+      document.getElementById('input-aluno-nome').value = a.nome;
+      document.getElementById('input-aluno-matricula').value = a.matricula;
+      document.getElementById('input-aluno-id').value = a.id;
+      openModalAluno(true);
+    }
+
+    function salvarAluno() {
+      const nome = document.getElementById('input-aluno-nome').value.trim();
+      const matricula = document.getElementById('input-aluno-matricula').value.trim();
+      const id = document.getElementById('input-aluno-id').value;
+      const msg = document.getElementById('msg-modal-aluno');
+
+      if (!nome || !matricula) return showMsg(msg, 'error', 'Preencha todos os campos.');
+
+      let res;
+      if (id) {
+        res = Alunos.update(turmaId, id, nome, matricula);
+      } else {
+        res = Alunos.create(turmaId, nome, matricula);
+      }
+
+      if (!res.ok) return showMsg(msg, 'error', res.msg);
+      closeModalAluno();
+      renderAlunos();
+    }
+
+    function removerAluno(id) {
+      if (!confirm('Remover este aluno?')) return;
+      Alunos.delete(turmaId, id);
+      renderAlunos();
+    }
+
+    document.getElementById('modal-aluno').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeModalAluno();
+    });
+
+    // ── UCs ──
+    function renderUCs() {
+      const ucs = UCs.getAll(turmaId);
+      document.getElementById('badge-total-ucs').textContent = `${ucs.length} UC${ucs.length !== 1 ? 's' : ''}`;
+      const list = document.getElementById('ucs-list');
+
+      if (ucs.length === 0) {
+        list.innerHTML = `<div class="empty-state"><div class="icon">📚</div><p>Nenhuma UC cadastrada.</p></div>`;
+        return;
+      }
+
+      list.innerHTML = ucs.map(uc => {
+        const aulas = Storage.getAulas(turmaId, uc.id);
+        return `
+          <div class="uc-card" style="margin-bottom:0.75rem;cursor:default">
+            <div class="uc-card-info">
+              <h3>${uc.nome}</h3>
+              <div class="uc-card-meta">
+                ${uc.totalAulas} aulas planejadas &nbsp;·&nbsp;
+                ${aulas.length} aulas registradas &nbsp;·&nbsp;
+                <span style="color:var(--accent)">peso por aula: ${(100/uc.totalAulas).toFixed(1)}%</span>
+              </div>
+            </div>
+            <div class="uc-card-actions">
+              <a href="uc.html?turma=${turmaId}&uc=${uc.id}" class="btn btn-primary btn-sm">Frequência →</a>
+              <button class="btn btn-ghost btn-sm" onclick="editarUC('${uc.id}')">✎</button>
+              <button class="btn btn-danger btn-sm" onclick="removerUC('${uc.id}')">✕</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function openModalUC(edit = false) {
+      document.getElementById('modal-uc-title').textContent = edit ? 'Editar UC' : 'Nova Unidade Curricular';
+      document.getElementById('btn-salvar-uc').textContent = edit ? 'Salvar' : 'Criar UC';
+      document.getElementById('modal-uc').classList.add('open');
+      if (!edit) {
+        document.getElementById('input-uc-nome').value = '';
+        document.getElementById('input-uc-aulas').value = '';
+        document.getElementById('input-uc-id').value = '';
+      }
+      setTimeout(() => document.getElementById('input-uc-nome').focus(), 100);
+    }
+
+    function closeModalUC() {
+      document.getElementById('modal-uc').classList.remove('open');
+      hideMsg(document.getElementById('msg-modal-uc'));
+    }
+
+    function editarUC(id) {
+      const uc = UCs.getById(turmaId, id);
+      if (!uc) return;
+      document.getElementById('input-uc-nome').value = uc.nome;
+      document.getElementById('input-uc-aulas').value = uc.totalAulas;
+      document.getElementById('input-uc-id').value = uc.id;
+      openModalUC(true);
+    }
+
+    function salvarUC() {
+      const nome = document.getElementById('input-uc-nome').value.trim();
+      const aulas = document.getElementById('input-uc-aulas').value;
+      const id = document.getElementById('input-uc-id').value;
+      const msg = document.getElementById('msg-modal-uc');
+
+      if (!nome || !aulas) return showMsg(msg, 'error', 'Preencha todos os campos.');
+      if (parseInt(aulas) < 1) return showMsg(msg, 'error', 'Total de aulas deve ser maior que 0.');
+
+      if (id) {
+        const res = UCs.update(turmaId, id, nome, aulas);
+        if (!res.ok) return showMsg(msg, 'error', res.msg);
+      } else {
+        UCs.create(turmaId, nome, aulas);
+      }
+
+      closeModalUC();
+      renderUCs();
+    }
+
+    function removerUC(id) {
+      if (!confirm('Remover esta UC e todas as suas aulas?')) return;
+      UCs.delete(turmaId, id);
+      renderUCs();
+    }
+
+    document.getElementById('modal-uc').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeModalUC();
+    });
+
+    // Init
+    renderAlunos();
+    renderUCs();
+  </script>
+</body>
+</html>
